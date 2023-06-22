@@ -1,0 +1,422 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+
+<script src="<c:url value='/js/dataSearchCom.js'/>"></script>
+<script type="text/javascript">
+	// 조회정보
+	var vCid = "<c:out value="${param.cid}" />";
+	var vCDate = "<c:out value="${param.c_date}" />";
+
+	var datagrid;
+	var dummyData = [];
+
+	var datagrid_pop;
+	var dummyData_pop = [];
+
+	$(document).ready(
+			function() {
+
+				$(window).resize(function() {
+					$('#div_patient_info').height($(window).height() - 260);
+				}).resize();
+
+				getPatientData(); // 환자정보
+
+				$('#tabs').tabs();
+
+				$("#imgdiv").css("height", $(window).height() - 250);
+
+				//bap 코드 그리드  초기화
+				createBapElements();
+
+				// BAP 순위
+				$('#btnBapRank').click(function() {
+					getBapRank();
+				});
+
+				// tab 생성
+				$.ajax({
+					url : "<c:url value='/search/getBapTab' />",
+					type : 'POST',
+					data : JSON.stringify({
+						cid : vCid,
+						c_date : vCDate
+					}),
+					contentType : 'application/json;charset=UTF-8',
+					dataType : 'json',
+					success : function(data) {
+
+						// 이미지 파일: 순번 역순으로 랭킹이 높음
+						for (var i = data.length - 1; i >= 0; i--) {
+
+							var ul = $('#tabs').tabs().find('ul');
+
+							console.log(data.length);
+
+							// 탭 헤더 : 파일 아이디
+							$(
+									"<li><a href='#bapData' id="
+											+ data[i].file_id
+											+ " onclick='setBapData(\""
+											+ data[i].file_id + "\")'>"
+											+ data[i].file_id + "</a></li>")
+									.appendTo(ul);
+							$('#tabs').tabs("refresh");
+
+						}
+						// data.length가 0보다 클때만 실행되도록 아니면 초기화
+						if (data.length > 0) {
+
+							// 첫번째 탭 active
+							$("#tabs").tabs({
+								active : 0
+							});
+
+							// 첫번째 file_id로 그리드 초기값 세팅
+							setBapData(data[data.length - 1].file_id);
+						} else {
+							return;
+						}
+					},
+					error : function() {
+						console.log('ajax error');
+					}
+
+				});
+
+			});
+
+	//bapcode 그리드 틀
+	function createBapElements() {
+		datagrid = tuiGrid.createGrid(
+		//그리드 옵션
+		{
+			//그리드 div id
+			gridId : 'bapGrid',
+			//그리드 높이
+			//edit불가 칼럼의 색상이 회색이 디폴트지만 false를 선언할 경우 항상 흰색으로 출력
+			scrollY : true,
+			readOnlyColorFlag : false,
+			height:$(window).height()-291,
+			rowHeaders : [ 'rowNum' ],
+			columns : [ {
+				header : 'Category',
+				name : 'category',
+				align : 'center'
+			}, {
+				header : 'BAP Code',
+				name : 'bap_code',
+				align : 'left'
+			}, {
+				header : 'RL',
+				name : 'bap_rl',
+				align : 'center'
+			}, {
+				header : 'Max',
+				name : 'bap_max',
+				align : 'center'
+			}, {
+				header : 'Min',
+				name : 'bap_min',
+				align : 'center'
+			}, {
+				header : 'ID',
+				name : 'bap_id',
+				align : 'center'
+			} ]
+		}, [],//초기 데이터
+		//이벤트
+		{});
+	}
+
+	function setBapData(vFileId) {
+		// 이미지 가져오기(GET 방식) 
+		var imgParam = $.param({
+			fileId : vFileId
+		});
+
+		// Image display
+		$('#bapImg').attr("src",
+				"<c:url value='/search/getBapImg' />?" + imgParam);
+
+		// 데이터 표시
+		var param = JSON.stringify({
+			cid : vCid,
+			c_date : vCDate,
+			file_id : vFileId
+		});
+		
+		$.ajax({
+			url : "<c:url value='/search/getBapData' />",
+			type : 'POST',
+			data : param,
+			contentType : 'application/json;charset=UTF-8',
+			dataType : 'json',
+			success : function(data) {
+				datagrid.resetData(data);
+			},
+			error : function() {
+				console.log('bapGrid error');
+			}
+		});
+
+	}
+
+	// BAP worst 순위 조회
+	function getBapRank() {
+
+		// 	console.log(vCid, vCDate);
+
+		$('#bapRankPop').dialog({
+			title : 'BAP worst 순위',
+			modal : true,
+			width : '400',
+			height : $(window).height() - 130
+		});
+
+		var param = JSON.stringify({
+			cid : vCid,
+			c_date : vCDate
+		});
+
+		$.ajax({
+			url : "<c:url value='/search/getBapRank' />",
+			type : 'POST',
+			data : param,
+			contentType : 'application/json;charset=UTF-8',
+			dataType : 'json',
+			success : function(data) {
+				createBapRankElements();
+				datagrid_pop.resetData(data);
+/* 				 datagrid_pop.setCellStyle('font-weight', 1, 1, 1, 2, 'bolder');
+				 datagrid_pop.setCellStyle('background', 1, 1, 1, 2, '#ffe2c9');
+				 datagrid_pop.setCellStyle('background', 2, 1, 5, 2, '#fff4ea');  */
+			},
+			error : function() {
+				console.log('BAP rank error');
+			}
+		});
+
+	}
+
+	function createBapRankElements() {
+		tuiGrid.destroyGrid(datagrid_pop);
+		datagrid_pop = tuiGrid.createGrid(
+		//그리드 옵션
+		{
+			//그리드 div id
+			gridId : 'bap-rank-div',
+			//그리드 높이
+			//edit불가 칼럼의 색상이 회색이 디폴트지만 false를 선언할 경우 항상 흰색으로 출력
+			height : 450,
+			scrollY : true,
+			readOnlyColorFlag : false,
+			rowHeaders : [ 'rowNum' ],
+			columns : [ {
+				header : '경락(측정맥)',
+				name : 'category',
+				align : 'center'
+			}, {
+				header : '경락(측정맥)',
+				name : 'code_nm',
+				align : 'left'
+			} ]
+		}, [],//초기 데이터
+		//이벤트
+		{});
+
+	}
+</script>
+
+<style>
+.tab_def {
+	width: 100px;
+	text-align: center;
+}
+
+#imgdiv {
+	border: 1px solid #ccc;
+	display: inline-block;
+	overflow: hidden;
+	position: relative;
+	margin-top: 7px;
+	overflow: auto;
+}
+
+#bapImg {
+	position: absolute;
+	left: -5%;
+	top: -10%;
+	width: 98%;
+}
+
+.ui-widget.ui-widget-content {
+	border: 0px;
+}
+
+.card {
+	box-shadow: none;
+	border: 0px;
+}
+
+#bapRankPop {
+	width: 410px;
+	display: none;
+}
+</style>
+
+<div class="content-wrap">
+	<div class="main">
+		<div class="container-fluid">
+			<section id="main-content mt-0 pt-0">
+				<div class="row">
+					<div class="col-12">
+						<div class="">
+							<%-- tab --%>
+							<div id="data_tab" style="display: flex;">
+								<ul class="nav nav-tabs pb-1 pt-2" style="flex: 8;">
+									<li class="nav-item" v-for="data in datas"><a
+										class="nav-link tab_def" aria-current="page"
+										v-bind:class="data.tab_active" v-bind:rel="data.tab_rel"
+										v-cloak>{{data.tab_nm}}</a></li>
+								</ul>
+								<button type="button" class="btn btn-warning" id="btnBapRank"
+									style="margin-top: 12px; margin-right: 10px;">BAP
+									worst 순위</button>
+								<button type="button" class="btn btn-info" id="toPatientBtn"
+									style="margin-top: 12px; margin-right: 10px;">환자목록</button>
+							</div>
+							<%-- 설문 정보 --%>
+							<div class="card pb-1 pt-2">
+								<div class="">
+									<div class="row">
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;">
+													<span class="text-secondary">환자번호</span>
+												</div>
+												<div class="search_val" style="min-width: 95px;"
+													id="sch_cid"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;">
+													<span class="text-secondary">진료일자</span>
+												</div>
+												<div class="search_val" style="min-width: 105px;"
+													id="sch_cdate"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;">
+													<span class="text-secondary">성별</span>
+												</div>
+												<div class="search_val" style="min-width: 45px;"
+													id="sch_sex"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;">
+													<span class="text-secondary">나이</span>
+												</div>
+												<div class="search_val" style="min-width: 100px;"
+													id="sch_age"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;">
+													<span class="text-secondary">키/몸무게</span>
+												</div>
+												<div class="search_val" style="min-width: 100px;"
+													id="sch_hweight"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;">
+													<span class="text-secondary">혈압</span>
+												</div>
+												<div class="search_val" style="min-width: 75px;"
+													id="sch_sdbp"></div>
+											</div>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-lg-12 grid_col">
+
+											<div id="tabs">
+												<ul id="tab_head"></ul>
+												<div class="col-lg-12 d-flex flex-row" id="bapData"
+													style="padding: 0px;">
+													<div class="col-lg-6" id="imgdiv">
+														<img id="bapImg" style="">
+													</div>
+													<div class="col-lg-6" id="bapGrid"
+														style="padding-right: 0px;"></div>
+												</div>
+											</div>
+
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+
+			</section>
+
+		</div>
+
+	</div>
+
+</div>
+
+<!-- BAP 순위 -->
+<div id="bapRankPop" class="container-fluid">
+	<div class="card" id="bap-rank-div"></div>
+</div>
+
+
+
+<script>
+	/* 상단 tab 생성 */
+	var tabInfo = [];
+	// if("${sessionScope.SessionInfo.tabInfo.survey_tab}"!="0") tabInfo.push({tab_nm:'설문',tab_rel:'survey',tab_active:'' });
+	// if("${sessionScope.SessionInfo.tabInfo.body_tab}"!="0") tabInfo.push({tab_nm:'바디차트',tab_rel:'bodychart',tab_active:'' });
+	// if("${sessionScope.SessionInfo.tabInfo.eav_tab}"!="0") tabInfo.push({tab_nm:'EAV',tab_rel:'eav',tab_active:'active' });
+	tabInfo.push({
+		tab_nm : '설문',
+		tab_rel : 'survey',
+		tab_active : ''
+	});
+	tabInfo.push({
+		tab_nm : '바디차트',
+		tab_rel : 'bodychart',
+		tab_active : ''
+	});
+	tabInfo.push({
+		tab_nm : 'EAV',
+		tab_rel : 'eav',
+		tab_active : 'active'
+	});
+	//tabInfo.push({tab_nm:'처방',tab_rel:'drug',tab_active:'' });
+	tabInfo.push({
+		tab_nm : '처방추천',
+		tab_rel : 'des',
+		tab_active : ''
+	});
+
+	new Vue({
+		el : "#data_tab",
+		data : {
+			datas : tabInfo
+		}
+	})
+</script>

@@ -1,0 +1,924 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+
+<script src="<c:url value='/js/dataSearchCom.js'/>"></script>
+<script type = "text/javascript">
+var datagrid;
+var dummyData = [];
+// 설문정보 페이지에서 보낸 파라미터 받기
+var vCid = "<c:out value="${param.cid}" />";
+var vCDate = "<c:out value="${param.c_date}" />";
+
+var datagrid;
+var dummyData = [];
+var vCurBdchart_code = ""; // 선택 바디차트 코드
+
+
+$(document).ready(function() {
+	
+	getPatientData(); // 환자정보
+	
+	// 바디차트 조회
+	getBodychart();
+	
+	// 전체설문 그리드 세팅
+	//createElements();
+	
+ 	// 바디차트 생성
+	$('#btnCreateBodychart').click(createBodychart);
+	
+	// 저장
+	$('#btnSave').click(insertBodychart);
+	
+	// 전체 설문
+	$('#btn_survey').click(getAllAnswers);
+// 	$('#surveyAllAnswers').draggable();
+	
+	// 바디차트 세부항목 하이라이트
+	$('.label-bodychart-info').click(highlightFont);
+	
+	$('.label-bodychart-info').popover({
+		html: true,
+	    title: '<div>설문<div><a class="close" href="#" onclick="closePopOver(1);return false;");">&times;</a></div></div>',
+	    //placement : "top",
+	    offset:"0px, 25px",
+	    content: function(){
+	    	
+	    	if (vCurBdchart_code != $(this).data("item")){
+	    		closePopOver();
+	    	}
+			
+	    	vCurBdchart_code = $(this).data("item");
+	    	
+	    	var param = JSON.stringify({
+	    		cid			 : vCid,
+	    		c_date		 : vCDate,
+	    		bdchart_code : vCurBdchart_code
+	    	});
+	    	
+	    	var vContentHtml = "";
+	    	
+	    	$.ajax({
+	    		url: "<c:url value='/search/getAnswer' />",
+	    		type: 'POST',
+	    		data: param,
+	    		contentType: 'application/json;charset=UTF-8',
+	    		dataType: 'json',
+	    		async: false,
+	    		success: function(data) {
+	    			vContentHtml = "<div class='table-responsive' >";
+	    			vContentHtml += "<table class='table'>";
+	    			vContentHtml += "<thead>";
+	    			vContentHtml += "<tr>";
+	    			vContentHtml += "<th style='width:20px'>No</th>";
+	    			vContentHtml += "<th style='width:250px'>질문</th>";
+	    			vContentHtml += "<th>답변</th>";
+	    			vContentHtml += "<th style='width:100px'>답변상세</th>";
+	    			vContentHtml += "<th>점수</th>";
+	    			vContentHtml += "</tr>";
+	    			vContentHtml += "</thead>";
+	    			vContentHtml += "<tbody>";
+                    
+ 	    	    	if( data.length > 0){
+	    	    		for ( var i=0; i< data.length; i++){
+		    	    		vContentHtml += "<tr>";
+		    	    		vContentHtml += "<th>" +data[i].qust_no + "</th>"
+		    	    		vContentHtml += "<td class='text-left'>" +data[i].qust_text + "</td>"
+		    	    		vContentHtml += "<td>" +data[i].ansr + "</td>"
+		    	    		vContentHtml += "<td>" +data[i].ansr_text + "</td>"
+		    	    		vContentHtml += "<td style='color:#5873fe;font-weight:bold;'>" +(data[i].bdchart_score??'') + "</td>"
+		    	    		vContentHtml += "</tr>";
+		    	    	}	
+	    	    	}else if(data.length == 0){
+	    	    		vContentHtml += "<tr>";
+    	    			vContentHtml += "<th colspan='5'> No Data. </th>"
+    	    			vContentHtml += "</tr>";	
+	    	    	}else{
+	    	    		vContentHtml += "<tr>";
+    	    			vContentHtml += "<th colspan='5'>"+data+"</th>"
+    	    			vContentHtml += "</tr>";	
+	    	    	}
+	    			
+	    	    	vContentHtml += "</tbody>";
+	    	    	vContentHtml += "</table>";
+	    		},error : function(e){
+	    			console.log(e);
+	    			vContentHtml = "조회 중 Error가 발생하였습니다."
+	    		}
+	    		
+	    	});
+
+	    	return vContentHtml;
+			
+	    }
+	    
+	});
+	
+	
+});
+
+
+function highlightFont(e){
+	$('.label-bodychart-info').removeClass("bodychart_clicked");
+	$('.input-bodychart-info').css("background","#FFF");
+	$(e.target).addClass("bodychart_clicked");
+	$("#"+$(e.target).attr("for")).css("background","#FDEAB4");
+}
+
+function closePopOver(type){
+	$('.label-bodychart-info').each(function () {
+        $(this).popover('hide');
+    });
+	
+	if(type==1){
+		$('.label-bodychart-info').removeClass("bodychart_clicked");
+	}
+}
+
+
+function getBodychart(){
+	
+	var param = JSON.stringify({
+		cid : vCid,
+		c_date : vCDate
+	});
+	
+	$.ajax({
+		url	: "<c:url value='/search/getBodychart' />",
+		type: 'POST',
+		data: param,
+		contentType: 'application/json;charset=UTF-8',
+		dataType: 'json',
+		success: function(data) {
+			
+			var bodychart = data[0];
+			
+			for(key in bodychart) {
+				if(bodychart[key] != -1){
+					$('#input_' + key).val(bodychart[key]);
+				}
+			}
+		},
+		error : function(jqxXHR, textStatus, errorThrown){
+			console.log(jqxXHR, textStatus, errorThrown);
+		}
+	});
+}
+
+
+
+//바디차트 생성
+function createBodychart(){
+	
+	var param = JSON.stringify({
+		cid : vCid,
+		c_date : vCDate
+	});
+	
+	$.ajax({
+		url: "<c:url value='/conv/surveyToBodychart' />",
+		type: 'POST',
+		data: param,
+		contentType: 'application/json;charset=UTF-8',
+		dataType: 'json',
+		success: function(data) {
+			if(data.result == 'ok') {
+				alert('바디차트 생성 완료.');
+				getPatientData();
+				getBodychart();
+			} else{
+				alert('바디차트 생성 실패.')
+			}
+		},
+		error: function(jqxXHR, textStatus, errorThrown){
+			console.log(jqxXHR, textStatus, errorThrown);
+			alert('바디차트 생성 실패.')
+		}
+		
+	});
+	
+}
+
+// 저장
+function insertBodychart(){
+	
+	if(!confirm('저장하시겠습니까?')) {
+		return;
+	}
+	
+	var param = {
+			cid	   : vCid,
+			c_date : vCDate
+	}
+	
+	var inputs = $("#div_bodychart_info input");
+	
+	for(var i=0; i<inputs.length; i++) {
+		var item = $(inputs[i]);
+		
+		param[item.prop('name')] = (item.val() == null || item.val() == '') ? -1 : item.val();
+		
+	}
+	
+	$.ajax({
+		url: "<c:url value='/search/insertBodychart' />",
+		type: 'POST',
+		data: JSON.stringify(param),
+		contentType: 'application/json;charset=UTF-8',
+		dataType: 'json',
+		success: function(data) {
+			if(data.result == 'ok') {
+				alert('저장을 완료하였습니다.');
+				getBodychart();
+			} else {
+				alert('저장을 실패하였습니다.');
+			}
+		},
+		error: function(jqxXHR, textStatus, errorThrown) {
+			console.log(jqxXHR, textStatus, errorThrown);
+		}
+	});
+}
+
+
+function getAllAnswers(){
+	param = JSON.stringify({
+		cid : vCid,
+		c_date : vCDate
+	});
+	
+	$.ajax({
+		url: "<c:url value='/search/getAnswer' />",
+		type: 'POST',
+		data: param,
+		contentType: 'application/json;charset=UTF-8',
+		dataType: 'json',
+// 		async: false,
+		success: function(data) {
+			createElements(data);
+			$('#surveyPop').dialog({
+				title: '전체 설문',
+				modal: true,
+				width: '800',
+				height: '500'
+			});
+			//datagrid.resetData(data, true);
+		},
+		error: function(jqxXHR, textStatus, errorThrown) {
+			console.log(jqxXHR, textStatus, errorThrown);
+		}
+	});
+}
+
+
+function createElements(data){
+	tuiGrid.destroyGrid(datagrid);
+	datagrid = tuiGrid.createGrid(
+			//그리드 옵션
+			{
+				//그리드 div id
+				gridId : 'surveyPop',
+				//그리드 높이
+				//edit불가 칼럼의 색상이 회색이 디폴트지만 false를 선언할 경우 항상 흰색으로 출력
+				scrollY : true,
+				height : 400,
+				readOnlyColorFlag : false,
+				rowHeaders : ['rowNum'],
+				columns : [ {
+					header : '질문',
+					name : 'qust_text',
+					align : 'left',
+					width : 400,
+					ellipsis: true,
+					tooltip:true
+				}, {
+					header : '답',
+					name : 'ansr',
+					align : 'center', 
+					tooltip:true
+				} , {
+					header : '보기',
+					name : 'ansr_text',
+					align : 'center', 
+					tooltip:true
+				}, {
+					header : '점수',
+					name : 'bdchart_score',
+					align : 'center', 
+					tooltip:true
+				}]
+			}, data,//초기 데이터
+			//이벤트
+			{
+			});		
+}
+
+</script>
+
+<style>
+
+	.tab_def{width: 100px; text-align: center;}
+	
+	.patientData {
+		border: none;
+		background-color: #ffffff !important;
+	}
+	
+	.div-bodychart {
+		background : #B7E1FD;
+ 		border:1px solid #ccc;
+	}
+	
+	.div-bodychart-info-parent {
+		flex : 1 0;
+		display : flex;
+		position : relative;
+		background : #B7E1FD;
+		opacity: 1;
+	    justify-content: center;
+	    align-items: center;
+	    margin-left:10px;
+	    margin-right:10px;
+	    width: 1100px;
+	    height:740px;
+	}
+	
+	.div-bodychart-info{
+		display: flex;
+	    justify-content: space-between;
+	    align-items: center;
+	}
+	
+	.input-bodychart-info {
+		width : 2rem;
+		height : 2rem;
+		padding-left : .2rem;
+		padding-right : .2rem;
+		text-align: center;
+		margin-right : .25rem;
+	}
+	
+	.label-bodychart-info {
+		margin-top : .25rem;
+		margin-bottop : .25rem!important;
+		cursor:pointer;
+	}
+	
+	.popover {
+		min-width: 40em !important;
+		height: 350px;
+	}
+	
+	.popover-body {
+	    height: 300px;
+		overflow-y: auto;
+		white-space:pre-wrap;
+		padding-top:0px;
+	}
+	
+	.table > thead > tr > th {
+		text-align:center;
+	}
+	
+	.table > tbody > tr > td {
+		line-height:15px;
+		text-align:center;
+		color:#343957;
+	}
+	
+	.table > tbody > tr > th {
+		line-height:15px;
+		text-align:center;
+		color:#343957;
+	}
+	
+	.bodychart_clicked{
+		color:#2549FE !important;
+		text-shadow: 2px 2px 2px #cecece; 
+	}
+	
+	.close{
+		margin-top:-23px;
+	}
+	
+	.label-bodychart-info{
+		font-size:14px;
+		font-weight:bold;
+		color:#343957;
+	}
+	
+	.form-control{
+		border-color:#A8A8A8
+	}
+	
+	.ui-widget-overlay.ui-front{
+		opacity: 0;
+	}
+</style>
+
+<div class="content-wrap">
+	<div class="main">
+		<div class="container-fluid">
+			<section id="main-content mt-0 pt-0">
+				<div class="row">
+					<div class="col-12">
+			
+						<%-- tab --%>
+						<div id="data_tab" style="display: flex;">
+							<ul class="nav nav-tabs pb-1 pt-2" style="flex: 8; margin-right: 10px;">
+								<li class="nav-item" v-for="data in datas">
+										<a class="nav-link tab_def" aria-current="page" v-bind:class="data.tab_active"  v-bind:rel="data.tab_rel"  v-cloak >{{data.tab_nm}}</a>
+									</li>
+							</ul>
+							<button type="button" class="btn btn-primary" id="btnCreateBodychart" style="margin-top: 12px; margin-right: 10px;">바디차트 생성</button>
+							<button type="button" class="btn btn-primary" id="btnSave" style="margin-top: 12px; margin-right: 10px;">저장</button>
+							<button type="button" class="btn btn-info" id="toPatientBtn" style="margin-top: 12px; margin-right: 10px;">환자목록</button>
+						</div>
+						<%-- 설문 정보 --%>
+						<div class="card pb-1 pt-2">
+							<div class="">
+								<div class="row">
+									<div class="col-lg-6 col-xl-2">
+										<div class="d-flex flex-row">
+											<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">환자번호</span></div>
+											<div class="search_val" style="min-width: 95px;" id="sch_cid"></div>
+										</div>
+									</div>
+									<div class="col-lg-6 col-xl-2">
+										<div class="d-flex flex-row">
+											<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">진료일자</span></div>
+											<div class="search_val"  style="min-width: 105px;" id="sch_cdate"></div>
+										</div>
+									</div>
+									<div class="col-lg-6 col-xl-2" >
+										<div class="d-flex flex-row">
+											<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">성별</span></div>
+											<div class="search_val"  style="min-width: 45px;" id="sch_sex"></div>
+										</div>
+									</div>
+									<div class="col-lg-6 col-xl-2" >
+										<div class="d-flex flex-row">
+											<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">나이</span></div>
+											<div class="search_val"  style="min-width: 100px;" id="sch_age"></div>
+										</div>
+									</div>
+									<div class="col-lg-6 col-xl-2">
+										<div class="d-flex flex-row">
+											<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">키/몸무게</span></div>
+											<div class="search_val"  style="min-width: 100px;" id="sch_hweight"></div>
+										</div>
+									</div>
+									<div class="col-lg-6 col-xl-2">
+										<div class="d-flex flex-row">
+											<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">혈압</span></div>
+											<div class="search_val"  style="min-width: 75px;" id="sch_sdbp"></div>
+										</div>
+									</div>
+								</div>
+								<div  class="row">
+									<div class="col-lg-12 grid_col" >
+				                    	<%-- body chart --%>	
+										<div class="div-bodychart">
+											<form class="div-bodychart-info-parent">
+												<div style="width: 1100px;">
+													<img class="text-align-center my-5" id="img_bodychart" src="/img/bodychart.png" style="width: 80%; height: 80%; padding-left: 200px;">
+													
+													<div id="div_bodychart_info">
+														<div class="div-bodychart-info" style="position: absolute; top: 10px; left: 50px;">
+															<button id="btn_survey" type="button" class="btn btn-sm btn-primary">전체 설문</button>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 10px; left: 130px;">
+															<input id="input_hk" name="hk" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_hk" data-item="hk">두통</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 10px; left: 210px;">
+															<input id="input_diz" name="diz" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_diz" data-item="diz">현훈</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 10px; left: 290px;">
+															<input id="input_noclh" name="noclh" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_noclh" data-item="noclh">두불청(두중감)</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 50px; left: 50px;">
+															<input id="input_sm" name="sm" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_sm" data-item="sm">구취</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 50px; left: 130px;">
+															<input id="input_mouthrs" name="mouthrs" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_mouthrs" data-item="mouthrs">구건</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 50px; left: 210px;">
+															<input id="input_bitt" name="bitt" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_bitt" data-item="bitt">구고</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 90px; left: 50px;">
+															<input id="input_d_time" name="d_time" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_d_time" data-item="d_time">급</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 90px; left: 130px;">
+															<input id="input_exe" name="exe" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_exe" data-item="exe">과</label>
+														</div>
+														
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 130px; left: 50px;">
+															<input id="input_d_reg" name="d_reg" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_d_reg" data-item="d_reg">불</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 130px; left: 130px;">
+															<input id="input_nod" name="nod" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_nod" data-item="nod">면</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 130px; left: 210px;">
+															<input id="input_met" name="met" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_met" data-item="met">육</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 130px; left: 290px;">
+															<input id="input_ins" name="ins" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_ins" data-item="ins">인</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 170px; left: 50px;">
+															<input id="input_cogh" name="cogh" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_cogh" data-item="cogh">해수</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 170px; left: 130px;">
+															<input id="input_sputum" name="sputum" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_sputum" data-item="sputum">객담</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 210px; left: 50px;">
+															<input id="input_thob" name="thob" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_thob" data-item="thob">목이물감</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 210px; left: 155px;">
+															<input id="input_sorthrr" name="sorthrr" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_sorthrr" data-item="sorthrr">인통</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 270px; left: 50px;">
+															<input id="input_di_ful" name="di_ful" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_di_ful" data-item="di_ful">소화불량</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 310px; left: 50px;">
+															<input id="input_epig_disp" name="epig_disp" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_epig_disp" data-item="epig_disp">명치끝답답</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 310px; left: 165px;">
+															<input id="input_ups" name="ups" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_ups" data-item="ups">체함</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 350px; left: 50px;">
+															<input id="input_epig_pa" name="epig_pa" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_epig_pa" data-item="epig_pa">명치통증</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 390px; left: 50px;">
+															<input id="input_gas" name="gas" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_gas" data-item="gas">더부룩, 가스</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 430px; left: 50px;">
+															<input id="input_bup" name="bup" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_bup" data-item="bup">트림</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 470px; left: 50px;">
+															<input id="input_epig_hsor" name="epig_hsor" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_epig_hsor" data-item="epig_hsor">속쓰림</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 470px; left: 130px;">
+															<input id="input_st_bak" name="st_bak" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_st_bak" data-item="st_bak">역류</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 510px; left: 50px;">
+															<input id="input_neas" name="neas" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_neas" data-item="neas">오심</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 510px; left: 130px;">
+															<input id="input_vomit" name="vomit" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_vomit" data-item="vomit">구토</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 550px; left: 50px;">
+															<input id="input_sto_pa" name="sto_pa" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_sto_pa" data-item="sto_pa">복통</label>
+														</div>
+														
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 630px; left: 50px;">
+															<input id="input_bodc" name="bodc" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_bodc" data-item="bodc">추위탐</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 690px; left: 50px;">
+															<input id="input_perc" name="perc" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_perc" data-item="perc">수/족 냉감</label>
+														</div>
+														
+														
+														
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 10px; left: 560px;">
+															<input id="input_insomnia" name="insomnia" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_insomnia" data-item="insomnia">불면</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 10px; left: 650px;">
+															<input id="input_msq_2" name="msq_2" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_msq_2" data-item="msq_2">천면</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 10px; left: 730px;">
+															<input id="input_msq_1" name="msq_1" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_msq_1" data-item="msq_1">다몽</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 50px; left: 450px;">
+															<input id="input_fatg" name="fatg" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_fatg" data-item="fatg">피로감</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 50px; left: 560px;">
+															<input id="input_fort" name="fort" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_fort" data-item="fort">건망증</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 90px; left: 450px;">
+															<input id="input_ebp" name="ebp" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_ebp" data-item="ebp">안구통증</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 130px; left: 450px;">
+															<input id="input_ebcog" name="ebcog" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_ebcog" data-item="ebcog">눈충혈</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 130px; left: 560px;">
+															<input id="input_ebdy" name="ebdy" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_ebdy" data-item="ebdy">안구건조</label>
+														</div>
+														
+														
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 210px; left: 450px;">
+															<input id="input_pal" name="pal" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_pal" data-item="pal">심계</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 210px; left: 560px;">
+															<input id="input_anx" name="anx" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_anx" data-item="anx">불안</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 250px; left: 450px;">
+															<input id="input_sto" name="sto" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_sto" data-item="sto">흉민</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 250px; left: 560px;">
+															<input id="input_chep" name="chep" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_chep" data-item="chep">흉통</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 290px; left: 450px;">
+															<input id="input_breprb" name="breprb" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_breprb" data-item="breprb">숨참</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 290px; left: 560px;">
+															<input id="input_sigh" name="sigh" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_sigh" data-item="sigh">한숨</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 330px; left: 450px;">
+															<input id="input_fev" name="fev" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_fev" data-item="fev">상열감</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 410px; left: 450px;">
+															<input id="input_urif_d" name="urif_d" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_urif_d" data-item="urif_d">1일 소변 횟수</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 450px; left: 450px;">
+															<input id="input_uri" name="uri" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_uri" data-item="uri">양호</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 490px; left: 450px;">
+															<input id="input_urif_n" name="urif_n" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_urif_n" data-item="urif_n">야간 소변 횟수</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 570px; left: 450px;">
+															<input id="input_ms" name="ms" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_ms" data-item="ms">월경/폐경</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 570px; left: 560px;">
+															<input id="input_fevsw" name="fevsw" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_fevsw" data-item="fevsw">갱년기</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 610px; left: 450px;">
+															<input id="input_cramp" name="cramp" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_cramp" data-item="cramp">생리통</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 610px; left: 560px;">
+															<input id="input_vag" name="vag" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_vag" data-item="vag">냉대하</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 690px; left: 450px;">
+															<input id="input_strf" name="strf" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_strf" data-item="strf">스트레스</label>
+														</div>
+														
+														
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 10px; left: 900px;">
+															<input id="input_skins" name="skins" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_skins" data-item="skins">피부</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 10px; left: 1000px;">
+															<input id="input_jointp" name="jointp" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_jointp" data-item="jointp">담</label>
+														</div>
+														
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 50px; left: 900px;">
+															<input id="input_ring" name="ring" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_ring" data-item="ring">이명</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 90px; left: 900px;">
+															<input id="input_shosif" name="shosif" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_shosif" data-item="shosif">향강</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 130px; left: 900px;">
+															<input id="input_shmp" name="shmp" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_shmp" data-item="shmp">견통</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 250px; left: 900px;">
+															<input id="input_bakp" name="bakp" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_bakp" data-item="bakp">배통</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 410px; left: 840px;">
+															<label class="label-bodychart-info" for="input_faces_num" data-item="faces_num">대변 </label>
+															<input id="input_faces_num" name="faces_num" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_faces_num" data-item="faces_num">회 / </label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 410px; left: 940px;">
+															<input id="input_faces_day" name="faces_day" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_faces_day" data-item="faces_day">일</label>
+														</div>
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 450px; left: 800px;">
+															<input id="input_cosp" name="cosp" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_cosp" data-item="cosp">경변</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 450px; left: 900px;">
+															<input id="input_diar" name="diar" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_diar" data-item="diar">연변</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 450px; left: 1000px;">
+															<input id="input_adc" name="adc" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_adc" data-item="adc">하복냉</label>
+														</div>
+														
+														
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 490px; left: 800px;">
+															<input id="input_stunp" name="stunp" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_stunp" data-item="stunp">후중</label>
+														</div>
+														
+														<div class="div-bodychart-info" style="position: absolute; top: 490px; left: 900px;">
+															<input id="input_nost" name="nost" class="form-control input-bodychart-info input-details">
+															<label class="label-bodychart-info" for="input_nost" data-item="nost">배변난</label>
+														</div>
+													</div>
+													
+												</div>
+											</form>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+		</div>
+	</div>
+</div>
+
+<div id="surveyAnswer" style="display: none;">
+	<div id="popover-body"></div>
+</div>
+
+<div id="surveyPop" class="container" style="display: none;"></div>
+
+<script>
+/* 상단 tab 생성 */
+var tabInfo = [];
+// if("${sessionScope.SessionInfo.tabInfo.survey_tab}"!="0") tabInfo.push({tab_nm:'설문',tab_rel:'survey',tab_active:'' });
+// if("${sessionScope.SessionInfo.tabInfo.body_tab}"!="0") tabInfo.push({tab_nm:'바디차트',tab_rel:'bodychart',tab_active:'active' });
+// if("${sessionScope.SessionInfo.tabInfo.eav_tab}"!="0") tabInfo.push({tab_nm:'EAV',tab_rel:'eav',tab_active:'' });
+tabInfo.push({tab_nm:'설문',tab_rel:'survey',tab_active:'' });
+tabInfo.push({tab_nm:'바디차트',tab_rel:'bodychart',tab_active:'active' });
+tabInfo.push({tab_nm:'EAV',tab_rel:'eav',tab_active:'' });
+//tabInfo.push({tab_nm:'처방',tab_rel:'drug',tab_active:'' });
+tabInfo.push({tab_nm:'처방추천',tab_rel:'des',tab_active:'' });
+	
+new Vue({
+	el:"#data_tab",
+	data:{
+		datas : tabInfo
+	}
+})
+</script>

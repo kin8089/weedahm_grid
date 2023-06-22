@@ -1,0 +1,307 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+<link rel="stylesheet"
+	href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/bootstrap-icons.css">
+
+<script type="text/javascript">
+	// Bap Code Grid createElements
+	var datagrid;
+	var dummyData = [];
+
+	$(document).ready(function() {
+
+		$(window).resize(function() {
+			$('#bap-div').height($(window).height() - 260);
+		}).resize();
+
+		getCategory();
+
+		createElements();
+		getBapData();
+
+		// 조회 버튼 
+		$('#btnSearch').click(function() {
+			getBapData();
+		});
+
+		// 입력 버튼
+		$('#btnReg').click(function() {
+			insertBapData();
+		});
+
+		// 저장 버튼
+		$('#btnSave').click(function() {
+			saveBapData();
+		});
+
+	});
+
+	// eavList 그리드 틀
+	function createElements() {
+
+		datagrid = tuiGrid.createGrid({
+			gridId : 'bap-div',
+			scrollY : true,
+			rowHeaders : [ 'rowNum', {
+				type : 'checkbox',
+				header : '삭제'
+			} ],
+			columns : [ {
+				header : 'BAP 코드',
+				name : 'bap_code',
+				align : 'center',
+				editor : 'text',
+				disabled : true
+
+			}, {
+				header : 'BAP 코드명',
+				name : 'bap_code_nm',
+				align : 'left',
+				width : 500,
+				editor : 'text'
+			}, {
+				header : '좌우 구분',
+				name : 'bap_rl',
+				align : 'center',
+				editor : 'text'
+			}, {
+				header : '카테고리',
+				name : 'category',
+				align : 'center',
+				editor : 'text'
+			}, {
+				header : 'code_nm',
+				name : 'code_nm',
+				align : 'left',
+				width : 400
+			} ]
+
+		}, [],//초기 데이터
+		//이벤트
+		{
+
+		});
+
+		/*
+		let gridOptions = {
+				properties : {
+					parentid 		 : 'bap-div',
+					id 				 : 'datagrid',
+					width 			 : '100%',
+					height 			 : '100%',
+					jsonref 		 : 'dummyData',
+					emptyrecords 	 : '조회된 데이터가 없습니다.',
+					allowcopy 		 : true,
+					allowpaste 		 : true,
+					selectmode 		 : 'free',
+					readonlyColor	 : _gridDisabledBackColor,
+					rowheader		 : ['seq', 'update'],
+					rowheadercaption : {seq : 'No', update: '수정'},
+					columns 		 : [
+						{caption	 : ['삭제'], ref: 'del_chk', type: 'checkbox', width: '3%', style: 'text-align: center'},
+						{caption	 : ['BAP 코드'], ref: 'bap_code', type: 'input', width: '15%', style: 'text-align: center', readonly:true},
+						{caption 	 : ['BAP 코드명'], ref: 'bap_code_nm', type: 'input', width: '32%', style: 'text-align: left'},
+						{caption 	 : ['좌우 구분'], ref: 'bap_rl', type: 'input', width: '15%', style: 'text-align: center'},
+						{caption 	 : ['카테고리'], ref: 'category', type: 'input',  width: '15%', style: 'text-align: center'},
+						{caption 	 : ['카테고리명'], ref: 'code_nm', type: 'input', width: '20%', style: 'text-align: left', readonly:true}
+					]
+				},
+				event : {
+					
+				}
+		}
+		datagrid = sbCom.createGrid(gridOptions);
+		 */
+
+	}
+
+	// BAP Code 조회
+	function getBapData() {
+
+		var param = JSON.stringify({
+			bap_code : $('#input_bap').val(),
+			bap_code_nm : $('#input_bap_nm').val(),
+			category : $('#input_category').val()
+		});
+
+		$.ajax({
+			url : "<c:url value='/dataMng/getBapCodeData' />",
+			type : 'POST',
+			data : param,
+			contentType : 'application/json;charset=UTF-8',
+			dataType : 'json',
+			success : function(data) {
+				// data refresh true
+				datagrid.resetData(data);
+				// 			datagrid.rebuild();
+			},
+			// loading img
+			beforeSend : function() {
+				//	datagrid.lockGrid(); 
+			},
+			// loading img unload
+			complete : function() {
+				//	datagrid.lockGrid(false);
+			}
+		});
+
+	}
+
+	// 등록 : 행 추가
+	function insertBapData() {
+		//	sbCom.addRow('datagrid');
+		//	datagrid.setCellDisabled(datagrid.getRows()-1,7,datagrid.getRows()-1,7,true)
+		//	datagrid.setCellStyle('background-color',datagrid.getRows()-1,7,datagrid.getRows()-1,7,_gridDisabledBackColor)
+		tuiGrid.appendRow(datagrid, {
+			use_yn : 'Y'
+		}, {
+			editable : [ 'bap_code', 'bap_code_nm' ]
+		});
+	}
+
+	// 저장
+	function saveBapData() {
+
+		var modifiedData = tuiGrid.getModifiedData(datagrid);
+
+		/* 		for(var i=0; i<modifiedData.length; i++) {
+		 if(modifiedData[i].status == 'i') {
+		 if(modifiedData[i].data.bap_code == '') {
+		 alert('BAP 코드를 입력해주세요.');
+		 return;
+		 } */
+
+		if (modifiedData[0].bap_code == null) {
+			alert('BAP 코드를 입력해주세요.');
+			return;
+		}
+
+		if (confirm('저장 하시겠습니까?')) {
+			$.ajax({
+				url : "<c:url value='/dataMng/saveBapCodeData' />",
+				type : 'POST',
+				data : JSON.stringify(modifiedData),
+				contentType : 'application/json;charset=UTF-8',
+				dataType : 'json',
+				success : function(data) {
+					//error나도 success로 들어갈 수 있음으로 확인
+					if (data.result == 'ok') {
+						alert('저장 되었습니다.');
+						//그리드 재조회
+					//	createElements();
+						getBapData();
+					} else {
+						alert('정상적으로 처리되지 않았습니다.');
+					}
+
+				},
+				error : function() {
+					alert('처리 중 오류가 발생하였습니다.');
+				},
+				// 로딩중 화면 disabled
+				beforeSend : function() {
+					//	datagrid.lockGrid(); // loading img.
+				},
+				// 로딩중 img
+				complete : function() {
+					//	datagrid.lockGrid(false); // loading img. unload
+				}
+			});
+		}
+	}
+
+	// 카테고리 selectbox
+	function getCategory() {
+
+		$.ajax({
+			url : "<c:url value='/dataMng/getCategory' />",
+			type : 'POST',
+			data : JSON.stringify({}),
+			contentType : 'application/json;charset=UTF-8',
+			dataType : 'json',
+			success : function(data) {
+				// 			console.log(data);
+
+				for (var i = 0; i < data.length; i++) {
+					$('#input_category').append(
+							"<option>" + data[i].category + ' - '
+									+ data[i].code_nm + "</option>");
+				}
+			},
+			error : function() {
+				console.log('getCategory error');
+			}
+		});
+
+	}
+
+	$(document).on('keypress', '#searchRow', function(e) {
+		if (e.keyCode == '13') {
+			e.preventDefault();
+			getBapData();
+		}
+	});
+</script>
+
+<style>
+</style>
+
+<div class="content-wrap">
+	<div class="main">
+		<div class="container-fluid">
+			<section id="main-content">
+				<div class="row">
+					<div class="col-lg-12">
+						<div class="card">
+							<div class="card-title">
+								<h3 class="float-left">EAV-BAP</h3>
+								<div class="button-list float-right">
+									<button type="button" class="btn btn-primary" id="btnSearch">조회</button>
+									<button type="button" class="btn btn-primary" id="btnReg">등록</button>
+									<button type="button" class="btn btn-primary" id="btnSave">저장</button>
+								</div>
+							</div>
+							<div class="card-body">
+								<div class="row search" id="searchRow">
+									<div class="col-sm-4 d-flex flex-row">
+										<div class="w-40 search_lbl text-right">
+											<span class="text-secondary">BAP 코드</span>
+										</div>
+										<div class="w-70">
+											<input type='text' class="form-control h-75 w-70"
+												id="input_bap" />
+										</div>
+									</div>
+									<div class="col-sm-4 d-flex flex-row">
+										<div class="w-50 search_lbl text-right">
+											<span class="text-secondary">BAP 코드명</span>
+										</div>
+										<div class="w-70">
+											<input type='text' class="form-control h-75 w-70"
+												id="input_bap_nm" />
+										</div>
+									</div>
+									<div class="col-sm-4 d-flex flex-row">
+										<div class="w-40 search_lbl text-right">
+											<span class="text-secondary">카테고리</span>
+										</div>
+										<select id="input_category" class="form-control p-0 pl-3 w-50">
+											<option selected></option>
+										</select>
+									</div>
+								</div>
+								<div id="bap-div"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+		</div>
+	</div>
+</div>
+
+
+
+
+

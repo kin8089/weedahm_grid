@@ -1,0 +1,306 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+
+<script src="<c:url value='/js/dataSearchCom.js'/>"></script>
+<script type = "text/javascript">
+
+// 설문정보 페이지에서 보낸 파라미터 받기
+var vCid = "<c:out value="${param.cid}" />";
+var vCDate = "<c:out value="${param.c_date}" />";
+
+var datagrid, datagrid_survey_sur;
+var dummyData = [], dummyData_survey_sur = [];
+
+$(document).ready(function() {
+	
+	$(window).resize(function(){
+		$('#div_survey_info').height($(window).height()-190);
+		$('#div_survey_sur_info').height($(window).height()-190);
+	}).resize();
+	
+	getPatientData(); // 환자정보
+	
+	// 데이터 바인딩
+	getSurveyData();
+	
+	$('#bodychartTab').click(function(){
+		var param = $.param({
+			cid : vCid,
+			c_date: vCDate
+		});
+		location.href="<c:url value='/search/bodychart' />?" + param;
+	});
+	
+	
+});
+
+
+function getPatientData(){
+	var param = JSON.stringify({
+		cid : vCid,
+		c_date : vCDate
+	});
+	
+	$.ajax({
+		url: "<c:url value='/search/getPatientData' />",
+		type: 'POST',
+		data: param,
+		contentType: 'application/json;charset=UTF-8',
+		dataType: 'json',
+		success: function(data) {
+			if(data.length>0){
+				$("#sch_cid").html(data[0].cid);
+				$("#sch_cdate").html(data[0].c_date.substring(0,4) + '-' + data[0].c_date.substring(4,6) + '-' + data[0].c_date.substring(6,8));
+				$("#sch_sex").html(data[0].sex??'');
+				$("#sch_age").html(data[0].age??'');
+				$("#sch_hweight").html((data[0].height??'') + '/' + (data[0].weight??''));
+				$("#sch_sdbp").html((data[0].sbp??'') + '/' + (data[0].dbp??''));
+			}
+		},
+		error: function(){
+			console.log('ajax error');
+		}
+	});
+}
+
+function getSurveyData(){
+	
+	var param = JSON.stringify({
+		cid : vCid,
+		c_date : vCDate
+	});
+	console.log(param);
+	$.ajax({
+		url: "<c:url value='/search/getSurveyData' />",
+		type: 'POST',
+		data: param,
+		contentType: 'application/json;charset=UTF-8',
+		dataType: 'json',
+		success: function(data) {
+			console.log(data);
+			let treeData = getTreeData(data,'qust_code','up_qust_code','level');
+			datagrid = tuiGrid.createGrid(
+			{
+				gridId: 'div_survey_info',
+				readOnlyColorFlag : false,
+				scrollY : true,
+				treeColumnOptions: {
+					useIcon : false,
+					name: 'qust_text'
+				},
+				rowHeaders: ['rowNum'],
+			    header: {
+			    	height: 80,
+			    	complexColumns: [
+			    		{
+							header: '설문',
+						    name: 'mergeColumn1',
+						    childNames: ['qust_text', 'qust_input_rmk']
+						},
+						{
+							header: '설문답변',
+						    name: 'mergeColumn2',
+						    childNames: ['ansr_val', 'ansr_val_rmk']
+						}
+			    	]
+			    },
+				columns: [
+					{ header: '설문그룹', 	name: 'qust_grp_txt', 	align:'center',	width:80 },
+					{ header: '설문', 	name: 'qust_text', 		align:'left',	width:500,	style:"font-size:12px;" },
+			    	{ header: '설문상세', 	name: 'qust_input_rmk',	align:'center',	width:80 },
+			        { header: '답변',		name: 'ansr_val',		align:'center',	width:120, tooltip:true },
+			        { header: '답변상세',	name: 'ansr_val_rmk',	align:'left',	style:"font-size:12px;", tooltip:true }
+				]
+				
+			},
+			treeData,//초기 데이터
+			//이벤트
+			{
+				
+			});
+		},
+		error: function(){
+			console.log('ajax error');
+		},
+		// loading img
+		beforeSend:function(){ 
+			//datagrid.lockGrid(); 
+		},
+		// loading img unload
+		complete:function(){ 
+			//datagrid.lockGrid(false); 
+		}
+	});
+	
+	$.ajax({
+		url: "<c:url value='/search/getSurveySurData' />",
+		type: 'POST',
+		data: param,
+		contentType: 'application/json;charset=UTF-8',
+		dataType: 'json',
+		success: function(data) {
+			datagrid = tuiGrid.createGrid(
+			{
+				gridId: 'div_survey_sur_info',
+				readOnlyColorFlag : false,
+			    header: {
+			    	height: 80,
+			    	complexColumns: [
+			    		{
+							header: '수술이력',
+						    name: 'mergeColumn1',
+						    childNames: ['sur_seq', 'sur_y', 'sur_m', 'sur_l', 'sur_res']
+						}
+			    	]
+			    },
+				columns: [
+					
+					{ header: 'seq', 	name: 'sur_seq', 	align:'center',	width:100 },
+					{ header: '년', 		name: 'sur_y', 		align:'center',	width:100 },
+			    	{ header: '월', 		name: 'sur_m',		align:'center',	width:100 },
+			        { header: '오래전',	name: 'sur_l',		align:'center',	width:100 },
+			        { header: '결과',		name: 'sur_res',	align:'left' }
+				]
+				
+			},
+			data,//초기 데이터
+			//이벤트
+			{
+				
+			});
+		},
+		error: function(){
+			console.log('ajax error');
+		},
+		// loading img
+		beforeSend:function(){ 
+			//datagrid_survey_sur.lockGrid(); 
+		},
+		// loading img unload
+		complete:function(){ 
+			//datagrid_survey_sur.lockGrid(false); 
+		}
+	});
+}
+
+
+</script>
+
+<style>
+
+	.tab_def{width: 100px; text-align: center;}
+	
+	.patientData {
+		border: none;
+		background-color: #ffffff !important;
+	}
+
+	.col-sm-12{
+		padding-top: 0px;
+	}
+	
+	#toPatientBtn{
+		margin-top: 12px;
+		margin-right: 10px;
+	}
+	
+	
+</style>
+
+<div class="content-wrap">
+	<div class="main">
+		<div class="container-fluid">
+			<section id="main-content mt-0 pt-0">
+				<div class="row">
+					<div class="col-12">
+						<div class="">
+							<%-- tab --%>
+							<div id="data_tab" style="display: flex;">
+								<ul class="nav nav-tabs pb-1 pt-2" style="flex: 8;">
+									<li class="nav-item" v-for="data in datas">
+										<a class="nav-link tab_def" aria-current="page" v-bind:class="data.tab_active"  v-bind:rel="data.tab_rel"  v-cloak >{{data.tab_nm}}</a>
+									</li>
+								</ul>
+								<button type="button" class="btn btn-info" id="toPatientBtn">환자목록</button>
+							</div>
+							<%-- 설문 정보 --%>
+							<div class="card pb-1 pt-2">
+								<div class="">
+									<div class="row">
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">환자번호</span></div>
+												<div class="search_val" style="min-width: 95px;" id="sch_cid"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">진료일자</span></div>
+												<div class="search_val"  style="min-width: 105px;" id="sch_cdate"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2" >
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">성별</span></div>
+												<div class="search_val"  style="min-width: 45px;" id="sch_sex"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2" >
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">나이</span></div>
+												<div class="search_val"  style="min-width: 100px;" id="sch_age"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">키/몸무게</span></div>
+												<div class="search_val"  style="min-width: 100px;" id="sch_hweight"></div>
+											</div>
+										</div>
+										<div class="col-lg-6 col-xl-2">
+											<div class="d-flex flex-row">
+												<div class="search_lbl" style="min-width: 90px;"><span class="text-secondary">혈압</span></div>
+												<div class="search_val"  style="min-width: 75px;" id="sch_sdbp"></div>
+											</div>
+										</div>
+									</div>
+									<div  class="row">
+										<div class="col-lg-9 grid_col" >
+					                    	<%-- grid area --%>	
+											<div id="div_survey_info" style="width:auto;"></div>
+										</div>
+										<div class="col-lg-3 grid_col" style="padding-left:5px;">
+					                    	<%-- grid area --%>	
+											<div id="div_survey_sur_info" style="width:auto;"></div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+					
+			</section>
+			
+		</div>
+	</div>
+</div>
+<script>
+/* 상단 tab 생성 */
+var tabInfo = [];
+// if("${sessionScope.SessionInfo.tabInfo.survey_tab}"!="0") tabInfo.push({tab_nm:'설문',tab_rel:'survey',tab_active:'active' });
+// if("${sessionScope.SessionInfo.tabInfo.body_tab}"!="0") tabInfo.push({tab_nm:'바디차트',tab_rel:'bodychart',tab_active:'' });
+// if("${sessionScope.SessionInfo.tabInfo.eav_tab}"!="0") tabInfo.push({tab_nm:'EAV',tab_rel:'eav',tab_active:'' });
+tabInfo.push({tab_nm:'설문',tab_rel:'survey',tab_active:'active' });
+tabInfo.push({tab_nm:'바디차트',tab_rel:'bodychart',tab_active:'' });
+tabInfo.push({tab_nm:'EAV',tab_rel:'eav',tab_active:'' });
+//tabInfo.push({tab_nm:'처방',tab_rel:'drug',tab_active:'' }); 
+tabInfo.push({tab_nm:'처방추천',tab_rel:'des',tab_active:'' });
+	
+new Vue({
+	el:"#data_tab",
+	data:{
+		datas : tabInfo
+	}
+})
+</script>

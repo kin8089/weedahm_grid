@@ -1,0 +1,1240 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+<link rel="stylesheet"
+	href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.1/font/bootstrap-icons.css">
+
+<script type="text/javascript">
+
+// eavList Grid createElements
+var datagrid = tui.Grid;
+var dummyData = [];
+// bapData Grid createBapElements
+var datagrid_pop;
+var dummyData_pop = [];
+
+// bap code mapping Grid createBapMappingElements
+var datagrid_codeMapping;
+var dummyData_codeMapping = [];
+
+// tab용 file_id 전역변수
+var _file_id = [];
+
+$(document).ready(function(){
+	
+	$(window).resize(function(){
+		$('#div_eav_info').height($(window).height()-260);
+	}).resize();
+	
+	 $(".tooltip_event").tooltip();
+	
+	
+	$('#startDate').datepicker({
+		dateFormat			: 'yy-mm-dd',
+		showMonthAfterYear	: true,
+		changeYear			: true,
+		changeMonth			: true,
+		monthNamesShort		: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
+		dayNamesMin			: ['일','월','화','수','목','금','토']
+	});
+	$('#endDate').datepicker({
+		dateFormat: 'yy-mm-dd',
+		// 년도,월 순으로 표기
+		showMonthAfterYear: true,
+		// 년도 선택 가능
+		changeYear: true,
+		// 월 선택 가능
+		changeMonth: true,
+		// 월 한글화
+		monthNamesShort: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
+		// 요일 한글화
+		dayNamesMin: ['일','월','화','수','목','금','토']
+	});
+	
+	$('#endDate').datepicker('setDate', 'today');
+	$('#startDate').datepicker('setDate', '-12M');
+	
+	createElements();
+
+	// 수동 OCR 버튼
+	$('#btnOCR').click(function(){
+		alert('개발 진행중입니다.');
+	});
+	
+	// 조회 버튼 
+	$('#btnSearch').click(function(){
+		getEavData();
+	});
+	
+	$('#tabs').tabs();
+	
+	/*
+	등록 버튼 :
+	cid, c_date는 eav grid에서 가져오고
+	file_id는 해당 탭 클릭시 전역변수 설정
+	*/ 
+	$('#btnAdd').click(function(){
+		if(datagrid_pop.getData().length>0){
+			var rowKey = tuiGrid.appendRow(datagrid_pop,{
+					use_yn:'Y',
+					cid		: datagrid_pop.getData()[0].cid,
+					c_date	: datagrid_pop.getData()[0].c_date,
+					file_id : datagrid_pop.getData()[0].file_id,
+				}
+			);
+			datagrid_pop.setValue(rowKey,'row_id',parseInt(rowKey)+1);
+		}
+		
+	});
+	
+	// 저장 버튼
+	$('#btnSave').click(function(){
+		saveBapData();
+	});
+	
+	// OCR 완료 버튼
+	$('#btnOcrFin').click(function(){
+		saveOcr();
+	});
+	
+	// ↑ row 이동
+	$('#moveRowUp').click(function(){
+		var focusedCell = datagrid_pop.getFocusedCell();
+		var rowKey = focusedCell.rowKey;
+		var no = datagrid_pop.getIndexOfRow(rowKey);
+		 // row 이동
+		if(rowKey == '0'){
+			alert("첫 번째 행입니다.");
+			return
+		}
+		datagrid_pop.moveRow(rowKey, no-1);
+	});
+	
+	// ↓ row 이동
+	$('#moveRowDown').click(function(){
+		var focusedCell = datagrid_pop.getFocusedCell();
+		var rowKey = focusedCell.rowKey;
+		var no = datagrid_pop.getIndexOfRow(rowKey);
+		if(rowKey == datagrid_pop.getRowCount()-1){
+			alert("마지막 행입니다.");
+			return
+		}
+		datagrid_pop.moveRow(rowKey, no+1);
+	});
+	
+	// Bap Code 매핑 저장 버튼
+	$('#saveBapBtn').click(function(){
+		bapCodeUpdate();
+	});
+	
+
+	// Bap 매핑정보 btn click
+	// 1. 데이터 바인딩 setBapMappingData
+	$('#btnMappingInfo').click(function(){
+		
+		$('#bapMappingPop').dialog({
+			title  : 'EAV BAP Code Mapping',
+			modal  : true,
+			width  : 900,
+			height : $(window).height() -130,
+		});
+		
+		$('#input_bap').val('');
+		setBapMappingData();
+	});
+	
+	// eav bap code mapping pop 조회
+	$('#btnMappingSearch').click(function(){
+		setBapMappingData();
+	});
+	
+	// eav bap code mapping pop 등록
+	$('#btnMappingAdd').click(function(){
+		addBapMappingData();
+	});
+	
+	// eav bap code mapping pop 저장
+	$('#btnMappingSave').click(function(){
+		saveBapCodeMapping();
+	});
+	
+});
+
+
+// eavList 그리드 틀
+function createElements(){
+	
+/* 	datagrid.applyTheme('custom', {
+		row : {
+			hover : {
+				background : '#d4e9f2'
+			}
+		}
+	}); */
+	
+	datagrid = tuiGrid.createGrid({
+		gridId : 'div_eav_info',	
+		paging : true,
+		scrollY : true,
+		rowPerPage : 25,
+		readOnlyColorFlag : false,
+		rowHeaders : [ 'rowNum'],
+		columns : [ {
+			header : '환자번호',
+			name : 'cid',
+			align : 'center',
+			width : 120
+		}, {
+			header : '일자',
+			name : 'c_date',
+			align : 'center',
+			formatter : eavDateFormat
+		}, {
+			header : '파일 수',
+			name : 'count',
+			align : 'center'
+		}, {
+			header : '진행상태',
+			name : 'work_stat_nm',
+			align : 'center'
+		}, {
+			header : '비고',
+			name : 'work_rmk',
+			align : 'center'
+		}]
+
+	}, [],//초기 데이터
+	//이벤트
+	{
+		celldblclick : function(rowKey, colName, grid) {
+			var cid = grid.getValue(rowKey,"cid");
+			var cDate = grid.getValue(rowKey,"c_date");
+			eavPop(cid,cDate);
+		}
+		
+	});
+}
+
+function eavPop(cid,cDate){
+	$("#img-div").css("height",$(window).height()-250);
+	// 환자번호
+	$('#cid').val(cid);
+	// 일자
+	var cDateNew = cDate.substr(0,4) + '-' + cDate.substr(4,2) + '-' + cDate.substr(6,2);
+	$('#c_date').val(cDateNew);
+	
+	$('#pop-cid-div').dialog({
+		title : 'EAV-BAP',
+		modal : true,
+		width : '80%',
+		height: $(window).height()-30,
+		// dialog 닫을 시 생성 tab 삭제
+		close : function(){
+			$('#tab_head').children().remove();
+			getEavData();
+		}
+	});
+	
+	// tab 생성
+	$.ajax({
+		url			: "<c:url value='/dataMng/getBapTab' />",
+		type		: 'POST',
+		data		: JSON.stringify({
+			cid		: cid,
+			c_date  : cDate
+		}),
+		contentType : 'application/json;charset=UTF-8',
+		dataType	: 'json',
+		success		: function(data){
+			for(var i=data.length-1; i>=0; i--) {
+				
+				var ul = $('#tabs').tabs().find($('#tab_head'));
+				
+				// 탭: 파일 아이디로 설정
+				$("<li><a href='#bapData' id=" +data[i].file_id+ " onclick='setBapData(\"" + data[i].file_id + "\")'>" + data[i].file_id + "</a></li>").appendTo(ul);
+				$('#tabs').tabs("refresh");
+				
+				// 상태 비고 값이 존재 할 때(정상이 아닐 시) tab에 표시
+				if(data[i].work_rmk !== undefined && data[i].work_rmk !== '') {
+					$('#' + data[i].file_id).css({
+						"color" : "#EB1D36"
+					})
+					
+				}
+				
+			}
+			// data.length가 0보다 클때만 실행되도록 아니면 초기화
+			if(data.length > 0) {
+				
+				// 첫번째 탭 active
+				$("#tabs").tabs({
+					active: 0
+				});
+				// 첫번째 file_id로 그리드 초기값 세팅
+				setBapData(data[data.length-1].file_id);
+				
+			} else {
+				return;
+			}
+		},
+		error: function(){
+			console.log('ajax error');
+		}
+		
+	});
+}
+
+// eav-list 그리드 데이터
+function getEavData(){
+	var cid = $('#input_cid').val();
+	//param으로 넘기는 startDate, endDate에서 - 제거
+	var startDate = $('#startDate').val().replace(/-/gi, '');
+	var endDate = $('#endDate').val().replace(/-/gi, '');
+	var work_stat = $('#status-select').val();
+
+	var param = JSON.stringify({
+		cid 	 	 : cid,
+		startDate	 : startDate,
+		endDate  	 : endDate,
+		work_stat	 : work_stat
+	});
+	
+	if(startDate > endDate) {
+		alert('일자를 확인해주세요.');
+	} else{
+		$.ajax({
+			url			:  "<c:url value='/dataMng/getEavData' />",
+			type		: 'POST',
+			data		: param,
+			contentType : 'application/json;charset=UTF-8',
+			dataType	: 'json',
+			success		: function(data) {
+				for(var i=0; i<data.length; i++) {
+					if(data[i].work_stat == 'Y'){
+						data[i].work_stat = '정상'
+					} else {
+						data[i].work_stat = '확인필요'
+					}
+				}
+				// data refresh true
+				datagrid.resetData(data);
+			},
+			// loading img
+			beforeSend:function(){
+			},
+			// loading img unload
+			complete:function(){
+			}
+		});
+	}
+}
+
+// bapcode 그리드 틀
+function createBapElements(data){
+	tuiGrid.destroyGrid(datagrid_pop);
+	datagrid_pop = tuiGrid.createGrid({
+		gridId : 'bapGrid',	
+		scrollY : true,
+		height:$(window).height()-291,
+		rowHeaders : ['rowNum', {type:'checkbox', header: '삭제'}],
+		columns : [ 
+		{
+			header : 'Category',
+			name : 'category',
+			align : 'center',
+			width : 120,
+			editor : 'text',
+			disabled : true
+		}, {
+			header : 'BAP Code',
+			name : 'bap_code',
+			align : 'center',
+			editor : 'text'
+		}, {
+			header : 'RL',
+			name : 'bap_rl',
+			align : 'center',
+			editor : 'text'
+		}, {
+			header : 'Max',
+			name : 'bap_max',
+			align : 'center',
+			editor : 'text'
+		}, {
+			header : 'Min',
+			name : 'bap_min',
+			align : 'center',
+			editor : 'text'
+		}, {
+			header : 'ID',
+			name : 'bap_id',
+			align : 'center',
+			editor : 'text'
+		}, {
+			header : '매핑체크',
+			name : 'bap_code_chk',
+			align : 'center',
+			hidden : true
+		}, {
+			header : 'status',
+			name : 'status',
+			align : 'center',
+			hidden : true
+		}, {
+			header : '매핑',
+			name : 'mapping_img',
+			align : 'center'
+	}]
+
+	}, 
+	data,//초기 데이터
+	//이벤트
+	{
+		onload : function(ev){
+			var gridData = ev.instance.getData();
+			gridData.forEach(row => {
+				if(row.bap_code_chk=="N"){
+					tuiGrid.setCellBackColor(ev.instance,row.rowKey,"bap_code","#FAD9A1");
+					var row = ev.instance.getRow(row.rowKey);
+					row.mapping_img = '⊙';
+					ev.instance.addCellClassName(row.rowKey, 'mapping_img', 'cursor_style')
+				}
+			})
+			
+			tuiGrid.setColBackColor(ev.instance, 'mapping_img', '#fff');
+			
+			//여기서 부터 수정
+			// 카테고리로 border-bottom 구분
+			let category = [],
+			preCategory = null;
+			
+			for(i=0; i<data.length; i++) {
+				
+				category.push(data[i].category);
+				
+				if(i > 0){
+					preCategory = data[i-1].category;
+					
+					if(category[i] != preCategory && category[i] != undefined && preCategory != undefined) {
+						//datagrid_pop.setCellStyle('border-bottom', i, 0, i, 9, '0.09rem solid');
+					}
+				}else{
+					if(data.length > 1){
+						if(category[i] != category[i+1] && category[i] != undefined && preCategory != undefined) {
+							//datagrid_pop.setCellStyle('border-bottom', i, 0, i, 9, '0.09rem solid');
+						}
+					}
+				}
+				
+			}
+			
+			// 그리드 폰트 사이즈 조정
+// 			datagrid_pop.setCellStyle('font-size', 1, 1, datagrid_pop.getRows()-1, datagrid_pop.getCols()-1, '0.5px');
+		},
+		
+
+			cellclick : function(rowKey,colName,grid){
+				if(colName == 'mapping_img') {
+					if(grid.getColumnValues('mapping_img')[rowKey] == '⊙') {
+						var bapCode = grid.getRow(rowKey);
+						mappingEdit(bapCode);
+					}
+				}
+
+			},
+	
+		
+	});
+}
+
+// EAV BAP Code Mapping Grid
+function createBapMappingElements(data){
+	tuiGrid.destroyGrid(datagrid_codeMapping);
+	datagrid_codeMapping = tuiGrid.createGrid({
+		gridId : 'bapMappingGrid',	
+		paging : true,
+		scrollY : true,
+		height : 620,
+		rowPerPage : 25,
+		rowHeaders : [ 'rowNum',{type:'checkbox', header: '삭제'}],
+		columns : [{
+			header : 'BAP 코드',
+			name : 'val',
+			align : 'left',
+			editor : 'text',
+			disabled: true
+		}, {
+			header : '조정 BAP 코드',
+			name : 'adj_val',
+			align : 'left',
+			editor : 'text'
+		}, {
+			header : '수정일',
+			name : 'upd_dt',
+			align : 'center',
+		}, {
+			header : '수정자',
+			name : 'upd_user',
+			align : 'center'
+		}]
+
+	}, data,//초기 데이터
+	//이벤트
+	{
+		
+	});
+}
+
+//	EAV BAP Code Mapping 데이터 등록
+function addBapMappingData() {
+	tuiGrid.appendRow(datagrid_codeMapping,{use_yn:'Y'},{editable:['val'], startAt : 0});
+}
+
+// EAV BAP Code Mapping 데이터 바인딩 및 조회
+function setBapMappingData(){
+	var param = JSON.stringify({
+		val : $('#input_bap').val()
+	});
+	$.ajax({
+		url			:  "<c:url value='/dataMng/getBapMappingData' />",
+		type		: 'POST',
+		data		: param,
+		contentType : 'application/json;charset=UTF-8',
+		dataType	: 'json',
+		success		: function(data) {
+			createBapMappingElements(data);
+		//	datagrid_codeMapping.resetData(data)
+		},
+		// loading img
+		beforeSend:function(){
+		},
+		// loading img unload
+		complete:function(){
+		}
+	});
+
+}
+
+//EAV BAP Code Mapping 데이터 저장
+function saveBapCodeMapping(){
+	
+	/*
+	1. 그리드에서 변경된 데이터 확인 getUpdateData()
+	2. 변경된사항 JSON.stringify 해서 ajax 로 넘김
+	3. 변경사항 저장
+	4. 재조회
+	*/
+	var param= JSON.stringify(tuiGrid.getModifiedData(datagrid_codeMapping));
+	if(confirm('저장 하시겠습니까?')) {
+		$.ajax({
+			url			: "<c:url value='/dataMng/saveBapCodeMapping' />",
+			type		: 'POST',
+			data		: param,
+			contentType : 'application/json;charset=UTF-8',
+			dataType	: 'json',
+			success		: function(data) {
+				if(data.result == 'ok'){
+					alert('저장 되었습니다.');
+					// 수정 내용 반영 그리드 재호출
+					setBapMappingData();
+					
+				} else {
+					alert('정상적으로 처리되지 않았습니다.')
+				}
+			},
+			error		: function(request, status, error) {
+				console.log(request, status, error);
+				alert('처리 중 오류가 발생하였습니다.');
+			}
+		});
+	}
+}
+
+
+$(document).on('keypress', '#searchRow', function(e) {
+	
+	if(e.keyCode == '13'){
+		e.preventDefault();
+		getEavData();
+	}
+	
+});
+
+$(document).on('keypress', '#bap-code-search', function(e) {
+	
+	if(e.keyCode == '13'){
+		e.preventDefault();
+		setBapMappingData();
+	}
+	
+});
+
+
+// bap img, bap data grid 데이터 바인딩
+function setBapData(vFileId){
+	var fc = datagrid.getFocusedCell();
+	var rowkey = Object.values(fc)[0];
+	var cid = datagrid.getRow(rowkey);
+	// 0. 탭 선택시 해당 파일 아이디 전역변수로 설정
+	_file_id = vFileId;
+	
+	// 1. 이미지 가져오기(GET 방식) 
+	var imgParam = $.param({
+		fileId : vFileId
+	});
+	
+	$('#bapImg').attr("src", "<c:url value='/search/getBapImg' />?" + imgParam);
+	//이미지 없을땐 없음 이미지 띄워줘야함
+	
+	// 2. 우측 그리드 데이터 바인딩
+	var param = JSON.stringify({
+		cid 	: cid.cid,
+		c_date  : cid.c_date,
+		file_id : vFileId
+	});
+
+	$.ajax({
+		url			: "<c:url value='/dataMng/getBapData' />",
+		type		: 'POST',
+		data		: param,
+		contentType : 'application/json;charset=UTF-8',
+		dataType	: 'json',
+		success		: function(data){
+			createBapElements(data);
+			// 데이터 바인딩
+			// datagrid_pop.resetData(data);	
+		},
+		error: function(){
+			console.log('bapGrid error');
+		}
+	});
+	
+	
+	// 3. tab별 상태 값 가져오기
+	$.ajax({
+		url 		: "<c:url value='/dataMng/getBapStatus' />",
+		type		: 'POST',
+		data		: param,
+		contentType : 'application/json;charset=UTF-8',
+		dataType	: 'json',
+		success		: function(data){
+			// 상태, 상태비고 표기
+			if(data[0].work_rmk === undefined || data[0].work_rmk == ''){ // 비고 없을 시 (정상)
+				$('#div-status').text(data[0].code_nm);
+				$('#' + data[0].file_id).css({
+					"color" : "#181818"
+				})
+			} else{
+				$('#div-status').text(data[0].work_rmk);
+			}
+			
+			$('#status-1').removeClass('active');
+			$('#status-1').removeClass('check');
+			$('#status-2').removeClass('active');
+			$('#status-2').removeClass('check');
+			$('#status-3').removeClass('active');
+			$('#status-3').removeClass('check');
+			$('#status-4').removeClass('active');
+			$('#btnOcrFin').css("display", "none");
+			
+			if(data[0].work_stat == 'Y') {
+				$('#status-1').addClass('active');
+				$('#status-2').addClass('active');
+				$('#status-3').addClass('active');
+				$('#status-4').addClass('active');
+			} else if(data[0].work_stat == 'C') {
+				$('#status-1').addClass('active');
+				$('#status-2').addClass('active');
+				$('#status-3').addClass('check');
+				$('#btnOcrFin').css("display", "block");
+			} else if(data[0].work_stat == 'FE') {
+				$('#status-1').addClass('active');
+				$('#status-2').addClass('check');
+				$('#btnOcrFin').css("display", "block");
+			} else if(data[0].work_stat == 'F') {
+				$('#status-1').addClass('check');
+				$('#btnOcrFin').css("display", "block");
+			}
+			
+		},
+		error: function(){
+			console.log('error');
+		}
+	});
+	
+}
+
+// OCR 완료 : 상태값(work_stat) 'Y'
+function saveOcr(){
+	
+	var param = JSON.stringify({
+		c_date	: datagrid_pop.getData()[0].c_date,
+		cid		: datagrid_pop.getData()[0].cid,
+		file_id : datagrid_pop.getData()[0].file_id
+	});
+	
+	if(confirm('OCR 완료 처리 하시곘습니까?')) {
+		$.ajax({
+			url : "<c:url value='/dataMng/saveOcr' />",
+			type : 'POST',
+			data: param,
+			contentType: 'application/json;charset=UTF-8',
+			dataType : 'json',
+			success : function(data){
+				if(data.result == 'ok'){
+					alert('완료되었습니다.');
+					setBapData(datagrid_pop.getData()[0].file_id);
+				} else {
+					alert('정상적으로 처리되지 않았습니다.');
+				}
+			},
+			error		: function(request, status, error) {
+				console.log(request, status, error);
+				alert('처리 중 오류가 발생하였습니다.');
+			}
+		});
+	}
+}
+
+
+// bap 데이터 저장
+function saveBapData(){
+	//var modifiedData = tuiGrid.getModifiedData(datagrid_pop);
+	var checkedRow = datagrid_pop.getCheckedRows()[0];
+	if(checkedRow != null){
+		datagrid_pop.setValue(checkedRow.rowKey, 'status', 'd');
+	};
+	var dataAll = datagrid_pop.getData();
+	if(confirm('저장 하시겠습니까?')) {
+		$.ajax({
+			url			: "<c:url value='/dataMng/saveBapData' />",
+			type		: 'POST',
+			data		: JSON.stringify(dataAll),
+			contentType : 'application/json;charset=UTF-8',
+			dataType	: 'json',
+			success		: function(data) {
+				if(data.result == 'ok'){
+					alert('저장되었습니다.');
+					// 수정 내용 반영 그리드 재호출
+					setBapData(datagrid_pop.getData()[0].file_id);
+				} else {
+					alert('정상적으로 처리되지 않았습니다.')
+				}
+			},
+			error		: function(request, status, error) {
+				console.log(request, status, error);
+				alert('처리 중 오류가 발생하였습니다.');
+			}
+		});
+	}
+
+}
+
+function mappingEdit(bapCode){
+	
+	$('#mappingEditPop').dialog({
+		title  : 'BAP Code 매핑',
+		modal  : true,
+		width  : 360,
+		height : 240,
+	});
+	$('#bapCode').val(bapCode.bap_code);
+	$('#cid').val(bapCode.cid);
+	$('#c_date').val(bapCode.c_date);
+	$('#bapCodeEdit').val('');
+}
+
+
+/*
+0. confirm
+1. tb_eav_data에서 해당 bap_code update
+	0. update
+	1. dialog close
+	2. setBapData grid 부분 재조회
+*/
+function bapCodeUpdate(){
+	// 필요한 데이터 bap_code (수정), cid, c_date, file_id
+	var rowData = datagrid_pop.getData(datagrid_pop.getRow());
+	var param = JSON.stringify({
+		cid 			: $('#cid').val(),
+		c_date 			: $('#c_date').val(),
+		file_id 		: rowData[0].file_id,
+		bap_code_before : $('#bapCode').val(),
+		bap_code 		: $('#bapCodeEdit').val(),
+		allCheck		: $('#applyAll').is(":checked") //checked: true, false
+	})
+	console.log(param)
+	if(confirm('저장 하시겠습니까?')) {
+		$.ajax({
+			url			: "<c:url value='/dataMng/updateEavData' />",
+			type		: 'POST',
+			data		: param,
+			contentType : 'application/json;charset=UTF-8',
+			dataType	: 'json',
+			success 	: function(data){
+				if(data.result == 'ok'){
+					alert('저장되었습니다.');
+					$('#mappingEditPop').dialog('close');
+					
+					// 수정  내용 반영 그리드 재호출
+					setBapData(rowData[0].file_id);
+					
+					$('#' + rowData.file_id).css({
+						'color' : '#000000'
+					});
+					
+				} else {
+					alert('정상적으로 처리되지 않았습니다.')
+				}
+			},
+			error 		: function(){
+				console.log('error');
+			}
+		});
+	}
+	
+}
+
+function eavDateFormat(obj){
+	if(typeof obj.value!="undefined"){
+		return obj.value.substring(0,4)+'-'+obj.value.substring(4,6)+'-'+obj.value.substring(6,8);
+	}else{
+		return '';
+	}
+}
+
+</script>
+
+<style>
+.cursor_style {
+	cursor: pointer;
+}
+
+#bapData {
+	height: 100%;
+	padding-top: 5px;
+}
+
+#pop-cid-div {
+	padding-top: 0px;
+	padding-bottom: 0px;
+	padding-right: 0px;
+	padding-left: 0px;
+	overflow: auto;
+	max-width: 1540px;
+	display: none;
+}
+
+.row {
+	height: 40px;
+	font-size: 13px;
+}
+
+.col-lg-12 {
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-left: 0px;
+}
+
+#tab_head {
+	background: #fff;
+	border: 0px;
+	border-bottom: 1px solid #C5C5C5;
+	padding-left: 10px;
+}
+
+#tabs {
+	border: 0px;
+}
+
+#img-div {
+	border: 1px solid #ccc;
+	display: inline-block;
+	overflow: hidden;
+	position: relative;
+	margin-top: 7px;
+	overflow: auto;
+}
+
+.ui-state-active, .ui-widget-content .ui-state-active, .ui-widget-header .ui-state-active,
+	a.ui-button:active, .ui-button:active, .ui-button.ui-state-active:hover
+	{
+	background: #7cb6f3;
+	border: #7cb6f3;
+}
+
+#bapImg {
+	position: absolute;
+	left: -5%;
+	top: -10%;
+	width: 98%;
+}
+
+#pop-col-div {
+	padding-left: 25px;
+}
+
+#btn-list {
+	margin-right: 35px;
+	height: 50px;
+}
+
+#div-status {
+	margin-left: 25px;
+	/*  		margin-top: 10px; */
+}
+
+.float-left {
+	margin-left: 35px;
+}
+
+#bapData-div {
+	padding-left: 0px;
+	padding-right: 0px;
+}
+
+#bapCode {
+	border: none;
+	background-color: #fff;
+	height: 30px;
+}
+
+#bapCodeEdit {
+	height: 30px;
+}
+
+#mappingEditPop {
+	padding-left: 0px;
+	padding-right: 0px;
+	display: none;
+}
+
+#bapCodeApply {
+	margin-left: 8px;
+	margin-right: 8px;
+	margin-top: 15px;
+}
+
+#bap-pop-row {
+	font-size: 14px;
+}
+
+#bap-pop-span {
+	margin-left: 0px;
+}
+
+#div-status {
+	font-size: 14px;
+	margin-left: 0px;
+	margin-top: 7px;
+	padding-left: 0px;
+	padding-right: 0px;
+	min-width: 34%;
+}
+
+#mapping-btn-div {
+	padding-right: 45px;
+}
+
+#status-select {
+	font-size: 15px;
+	max-width: 180px;
+	text-align: left;
+}
+
+#btnMappingAdd {
+	margin-right: 5px;
+	margin-left: 5px;
+}
+
+#mapping-pop-main-row {
+	margin-right: 3px;
+}
+
+#bapMappingPop {
+	display: none;
+}
+
+#mapping-btn-list {
+	margin-left: 15px;
+	padding-top: 2px;
+}
+
+#bap-code-search {
+	padding-left: 0px;
+}
+
+#progress-div {
+	height: 40px;
+}
+
+#progress {
+	position: relative;
+	margin-bottom: 30px;
+	max-width: 41%;
+}
+
+#progress-bar {
+	position: absolute;
+	background: lightseagreen;
+	height: 5px;
+	width: 60%;
+	top: 50%;
+	left: 50px;
+	margin-top: 15px;
+}
+
+#progress-num {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	justify-content: space-between;
+}
+
+#progress-num::before {
+	content: "";
+	background-color: lightgray;
+	position: absolute;
+	top: 50%;
+	left: 0;
+	height: 5px;
+	width: 100%;
+	z-index: -1;
+}
+
+#progress-num .step {
+	border: 3px solid lightgray;
+	border-radius: 5%;
+	width: 93px;
+	height: 35px;
+	line-height: 25px;
+	text-align: center;
+	background-color: #fff;
+	font-family: sans-serif;
+	font-size: 13px;
+	position: relative;
+	z-index: 1;
+}
+
+#progress-num .step.active {
+	border-color: lightseagreen;
+	background-color: lightseagreen;
+	color: #fff;
+}
+
+#progress-num .step.check {
+	border: 2px dashed #ff7272;
+	background-color: #c1e6e2;
+	color: #000;
+}
+
+#btn-list-div {
+	right: -12%;
+}
+</style>
+
+<div class="content-wrap">
+	<div class="main">
+		<div class="container-fluid">
+			<section id="main-content">
+				<div class="row">
+					<div class="col-lg-12">
+						<div class="card">
+							<div class="card-title">
+								<h3 class="float-left ml-0">EAV</h3>
+
+								<div class="button-list float-right">
+
+									<button type="button" class="btn btn-primary" id="btnSearch">조회</button>
+									<!-- 	                                <button type="button" class="btn btn-primary" id="btnOCR">EAV OCR</button> -->
+								</div>
+							</div>
+							<div class="card-body">
+								<div class="row search" id="searchRow">
+									<div class="col-sm-4 d-flex flex-row pl-0">
+										<div class="w-30 search_lbl text-center">
+											<span class="text-secondary">환자번호</span>
+										</div>
+										<div class="w-70">
+											<input type='text' class="form-control h-75 w-70"
+												id="input_cid" />
+										</div>
+									</div>
+									<div class="col-sm-4 d-flex flex-row">
+										<div class="w-30 search_lbl text-right">
+											<span class="text-secondary">일자</span>
+										</div>
+										<div class="w-90 d-flex flex-row">
+											<input type="text" class="form-control h-75 w-60"
+												id="startDate" style="text-align: center;">
+											&nbsp;~&nbsp; <input type="text"
+												class="form-control h-75 w-60" id="endDate"
+												style="text-align: center;">
+										</div>
+									</div>
+									<div class="col-sm-4 d-flex flex-row">
+										<div class="w-40 search_lbl text-right">
+											<span class="text-secondary">상태</span>
+										</div>
+										<select id="status-select" class="form-control p-0 pl-3 w-80">
+											<option value=''></option>
+											<option value='F'>데이터 추출 오류</option>
+											<option value='FE' selected>데이터 적재 오류</option>
+											<option value='C'>BAP 코드 불일치 오류</option>
+											<option value='Y'>OCR 완료</option>
+										</select>
+									</div>
+								</div>
+								<div id="div_eav_info"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+		</div>
+	</div>
+</div>
+
+
+<div id="mappingEditPop" class="container">
+	<div class="col-sm-12 pt-3" id="bapData-div">
+		<div>
+
+			<table class="table no-border">
+				<tr style="border: 0px;">
+					<td>BAP Code</td>
+					<td><input type="text" id="bapCode"
+						class="form-control ui-corner-all" readonly></td>
+				</tr>
+				<tr>
+					<td>BAP Code 조정</td>
+					<td><input type="text" id="bapCodeEdit"
+						class="form-control ui-corner-all"></td>
+				</tr>
+			</table>
+
+			<div id="bapCodeApply">
+				<input type="checkbox" id="applyAll">&nbsp;<label
+					for="applyAll">전체 적용</label>
+				<button type="button" class="btn btn-primary float-right"
+					id="saveBapBtn">저장</button>
+			</div>
+
+		</div>
+	</div>
+</div>
+
+<!-- EAV-BAP pop -->
+<div id="pop-cid-div" class="container">
+	<div class="main">
+		<div>
+			<section id="main-content">
+				<div class="row">
+					<div class="col-lg-12">
+						<div class="pb-1 pt-1">
+							<div class="row" id="bap-pop-row">
+								<div class="col-lg-3" id="pop-col-div">
+									<div class="d-flex">
+										<span class="search-label float-left" id="bap-pop-span">환자번호</span>
+										<div>
+											<input type='text' class="form-control h-75 w-80" id="cid"
+												style="border: none; background-color: #ffffff" readonly />
+										</div>
+									</div>
+								</div>
+								<div class="col-lg-3">
+									<div class="d-flex ">
+										<span class="search-label float-left">일자</span>
+										<div>
+											<input type='text' class="form-control h-75 w-80" id="c_date"
+												style="border: none; background-color: #ffffff" readonly />
+										</div>
+									</div>
+								</div>
+								<div class="col-lg-6" id="mapping-btn-div">
+									<button type="button" class="btn btn-primary float-right"
+										id="btnMappingInfo">BAP 매핑정보</button>
+								</div>
+							</div>
+							<div id="tabs">
+								<ul id="tab_head"></ul>
+								<div id="progress-div" class="d-flex col-lg-12">
+									<div class="d-flex col-lg-4" id="progress">
+										<div id="progress-bar"></div>
+										<ul id="progress-num">
+											<li id="status-1" class="step">데이터 추출</li>&nbsp;&nbsp;&nbsp;&nbsp;
+											<li id="status-2" class="step">데이터 적재</li>&nbsp;&nbsp;&nbsp;&nbsp;
+											<li id="status-3" class="step">BAP 코드 확인</li>&nbsp;&nbsp;&nbsp;&nbsp;
+											<li id="status-4" class="step">OCR 완료</li>&nbsp;&nbsp;&nbsp;&nbsp;
+										</ul>
+									</div>
+									<div class="d-flex col-lg-3" id="div-status">
+										<span class="search-label" id="div-status"></span>
+									</div>
+									<div class="d-flex col-lg-5" id="btn-list-div">
+										<div class="button-list d-flex" id="btn-list">
+											<button type="button" class="btn btn-primary" id="btnAdd">등록</button>
+											&nbsp;
+											<button type="button" class="btn btn-primary" id="btnSave">저장</button>
+											&nbsp;
+											<button type="button" class="btn btn-success" id="btnOcrFin">OCR
+												완료</button>
+											&nbsp;
+											<button type="button" class="btn btn-secondary"
+												id="moveRowUp">↑</button>
+											&nbsp;
+											<button type="button" class="btn btn-secondary"
+												id="moveRowDown">↓</button>
+										</div>
+									</div>
+								</div>
+								<div class="col-lg-12 d-flex flex-row" id="bapData">
+									<div id="img-div" class="col-lg-6">
+										<img id="bapImg">
+									</div>
+									<div class="col-lg-6" id="bapGrid"></div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+		</div>
+	</div>
+</div>
+
+
+<!-- Bap 코드 매핑 pop -->
+<div id="bapMappingPop" class="container">
+	<div class="main">
+		<div>
+			<section id="main-content">
+				<div class="row" id="mapping-pop-main-row">
+					<div class="col-lg-12 d-flex flex-row" id="bap-row">
+						<div class="col-lg-6 d-flex flex-row" id="bap-code-search">
+							<div class="w-30 search_lbl text-right">
+								<span class="text-secondary">BAP 코드</span>
+							</div>
+							<div class="w-40">
+								<input type='text' class="form-control h-75 w-70" id="input_bap" />
+							</div>
+						</div>
+						<div class="col-lg-6" id="mapping-btn-list"
+							style="margin-left: 15px; padding-top: 2px;">
+							<button type="button" class="btn btn-primary float-right"
+								id="btnMappingSave">저장</button>
+							<button type="button" class="btn btn-primary float-right"
+								id="btnMappingAdd">등록</button>
+							<button type="button" class="btn btn-primary float-right"
+								id="btnMappingSearch">조회</button>
+						</div>
+					</div>
+				</div>
+				<div id="bapMappingGrid"></div>
+			</section>
+		</div>
+	</div>
+</div>
+
+

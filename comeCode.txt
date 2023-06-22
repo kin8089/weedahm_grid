@@ -1,0 +1,441 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+
+<script type="text/javascript">
+	var datagrid;
+	// sbgrid jsonref에 쓰이는 전역변수
+	var dummyData = [];
+
+	$(document).ready(function() {
+
+		//sheet 높이 자동 조절
+		$(window).resize(function() {
+			$('#div_user_info').height($(window).height() - 260);
+		}).resize();
+
+		var paramData = JSON.stringify({
+			"is_blank" : "Y"
+		});
+
+		var vAuthComboData = _getMCode(paramData);
+
+		_setSelectBox("VUE", "input_roleReg", vAuthComboData, "");
+
+		createElements();
+		getCodeData();
+
+		// 조회 버튼
+		$('#searchBtn').click(function() {
+			getCodeData();
+		});
+
+		// 입력 버튼
+		$('#regBtn').click(function() {
+			insertCodeData();
+		});
+
+		$('#saveBtn').click(function() {
+			editCodeData();
+		});
+
+		$('#saveExcel').click(function() {
+			saveExcelFile();
+		});
+
+	});
+
+	function createElements() {
+
+		datagrid = tuiGrid.createGrid({
+			gridId : 'div_user_info',
+			scrollY:true,
+			rowHeaders : [ 'rowNum', {type:'checkbox',header:'삭제'} ],	
+			columns : [ {
+				header : '대분류 코드',
+				name : 'm_code',
+				align : 'center',
+				width : 150,
+				editor:'text',
+				disabled:true, 
+				tooltip:true
+			}, {
+				header : '코드',
+				name : 's_code',
+				align : 'center',
+				width : 150,
+				editor:'text',
+				disabled:true, 
+				tooltip:true
+			}, {
+				header : '코드명',
+				name : 'code_nm',
+				align : 'left',
+				editor:'text', 
+				tooltip:true
+			},
+			{ header: '사용',   name: 'use_yn',      formatter: 'listItemText', width:100, align:'center',
+	             editor: { type: 'select', options: { listItems: [{value:"Y",text:"사용"},{value:"N",text:"미사용"}] } }, 
+					tooltip:true
+	        },
+			{
+				header : '속성 1',
+				name : 'attr1',
+				align : 'left',
+				ellipsis: true,
+				editor:'text', 
+				tooltip:true
+			}, {
+				header : '속성 2',
+				name : 'attr2',
+				align : 'left',
+				editor:'text'
+			}, {
+				header : '속성 3',
+				name : 'attr3',
+				align : 'left',
+				editor:'text'
+			}, {
+				header : '비고',
+				name : 'rmk',
+				align : 'left',
+				editor:'text'
+			}, {
+				header : '수정일',
+				name : 'upd_dt',
+				align : 'center',
+				width : 100
+			} ]
+
+		}, [],//초기 데이터
+		//이벤트
+		{
+			onload : function(ev) {
+				console.log(datagrid)
+			}
+
+		});
+	}
+
+
+
+	/*
+	 // 그리드  init
+	 function createElements(){
+	 let gridOptions = {
+	 properties : {
+	 parentid 		: 'div_user_info',
+	 id 				: 'datagrid',        
+	 width 			: '100%',             
+	 height 			: '100%',                
+	 jsonref 		: 'dummyData',          
+	 rowheader 		: ['seq', 'update'],        
+	 rowheadercaption: {seq : 'No', update: '수정'},
+	 rowheaderwidth  : {seq: '30', update: '30'},  
+	 fixedrowheight  : '22',  
+	 readonlyColor	: _gridDisabledBackColor,
+	 tooltip 		: true,
+	 allowcopy 		: true,
+	 allowpaste 		: true,
+	 selectmode 		: 'free',
+	 updatepastestatus : true,
+	 tooltipdelay 	: 100,
+	 emptyrecords 	: '조회된 데이터가 없습니다.',
+	 columns : [
+	 {caption: ['삭제'], ref: 'del_chk', type: 'checkbox', width: '3%', style: 'text-align: center'},
+	 {caption: ['대분류 코드'], ref: 'm_code', type: 'input', width: '10%', style: 'text-align: center',		readonly:true},
+	 {caption: ['코드'], ref: 's_code', type: 'input', width: '10%', style: 'text-align: center',			readonly:true},
+	 {caption: ['코드명'], ref: 'code_nm', type: 'input', width: '20%', style: 'text-align: left'},
+	 {caption: ['사용'], ref: 'use_yn', type: 'combo',  width: '5%', typeinfo: {ref: '_gridComboYn', label: 'label', value: 'value'}, style: 'text-align: center'},
+	 {caption: ['속성 1'], ref: 'attr1', type: 'input', width: '10%', style: 'text-align: left'},
+	 {caption: ['속성 2'], ref: 'attr2', type: 'input', width: '10%', style: 'text-align: left'},
+	 {caption: ['속성 3'], ref: 'attr3', type: 'input', width: '10%', style: 'text-align: left'},
+	 {caption: ['비고'], ref: 'rmk', type: 'input', width: '12%', style: 'text-align: left'},
+	 {caption: ['수정일'], ref: 'upd_dt', type: 'input', width: '10%', style: 'text-align: center', readonly: true}
+	 ]
+	 },
+	 event : {
+	
+	 }
+	 }
+	 datagrid = sbCom.createGrid(gridOptions);
+	
+	 };
+	 */
+	// 엔터로 조회
+	$(document).on('keypress', '#searchRow', function(e) {
+		if (e.keyCode == '13') {
+			e.preventDefault();
+			getCodeData();
+		}
+
+	});
+
+	// 조회
+	function getCodeData() {
+
+		//대분류
+		var m_code = $('#input_roleReg').val();
+		//코드명
+		var code_nm = $('#input_codeNm').val();
+		//사용
+		var use_yn = $('#input_useYN').val();
+
+		var param = JSON.stringify({
+			m_code : m_code,
+			code_nm : code_nm,
+			use_yn : use_yn
+		});
+
+		$.ajax({
+			url : "<c:url value='/admin/getCodeData' />",
+			type : 'POST',
+			data : param,
+			contentType : 'application/json;charset=UTF-8',
+			dataType : 'json',
+			success : function(data) {
+				datagrid.resetData(data);
+				/*
+				datagrid.rebuild();
+				
+				// 조회 데이터 m_code, s_code disabled true
+				datagrid.setCellDisabled(1, datagrid.getColRef("m_code"), datagrid.getRows()-1, datagrid.getColRef("s_code"), true);
+				// 조회 데이터 m_code, s_code disabled true 배경 설정
+				datagrid.setCellStyle('background-color', 1, datagrid.getColRef("m_code"), datagrid.getRows()-1, datagrid.getColRef("s_code"), _gridDisabledBackColor);
+				// 조회 데이터 수정일 배경 설정
+				datagrid.setColStyle(datagrid.getColRef("upd_dt"), 'data', 'background-color', _gridDisabledBackColor);
+				 */
+			},
+			error : function() {
+				console.log('ajax error');
+			},
+			// 로딩중 화면 disabled
+			beforeSend : function() {
+				//	datagrid.lockGrid(); // loading img.
+			},
+			// 로딩중 img
+			complete : function() {
+				//	datagrid.lockGrid(false); // loading img. unload
+			}
+		});
+
+	}
+
+	// 입력 -> 행 추가
+	function insertCodeData() {
+		// addRow 시 메소드 동작 후 바로 refresh: true, 사용 Y로 바인딩, 추가된 row로 focus 이동
+		//datagrid.addRow(true, {'use_yn' : 'Y'}, true);
+		/* sbCom.addRow('datagrid', {
+			'use_yn' : 'Y'
+		}); */
+		tuiGrid.appendRow(datagrid,{use_yn:'Y'},{editable:['m_code','s_code']});
+	}
+
+	// 저장
+	function editCodeData() {
+		var modifiedData = tuiGrid.getModifiedData(datagrid);
+		if(modifiedData.length==0){
+			alert('저장할 데이터가 없습니다.');
+			return;
+		}
+		
+		if (confirm('저장 하시겠습니까?')) {
+			$.ajax({
+				url : "<c:url value='/admin/editCodeData' />",
+				type : 'POST',
+				data : JSON.stringify(modifiedData),
+				contentType : 'application/json;charset=UTF-8',
+				dataType : 'json',
+				success : function(data) {
+					//error나도 success로 들어갈 수 있음으로 확인
+					if (data.result == 'ok') {
+						alert('저장 되었습니다.');
+						getCodeData();
+					} else {
+						alert('정상적으로 처리되지 않았습니다.');
+					}
+				},
+				error : function() {
+					alert('처리 중 오류가 발생하였습니다.');
+				},
+				// 로딩중 화면 disabled
+				beforeSend : function() {
+					//	datagrid.lockGrid(); // loading img.
+				},
+				// 로딩중 img
+				complete : function() {
+					//	datagrid.lockGrid(false); // loading img. unload
+				}
+			});
+		}
+		
+		/*
+		// false -> 스트링화
+		// true -> JSON.object
+		var gridData = datagrid.getUpdateData(true, 'all');
+
+		// i 일때 key값 체크
+		for (var i = 0; i < gridData.length; i++) {
+			if (gridData[i].status == 'i') {
+				if (gridData[i].data.m_code == ''
+						|| gridData[i].data.s_code == '') {
+					alert('필수값을 입력해주세요.');
+					return;
+				}
+			}
+		}
+
+
+		if (confirm('저장 하시겠습니까?')) {
+			$.ajax({
+				url : "<c:url value='/admin/editCodeData' />",
+				type : 'POST',
+				data : JSON.stringify(gridData),
+				contentType : 'application/json;charset=UTF-8',
+				dataType : 'json',
+				success : function(data) {
+					//error나도 success로 들어갈 수 있음으로 확인
+					if (data.result == 'ok') {
+						alert('저장 되었습니다.');
+						//그리드 재조회
+						createElements();
+						getCodeData();
+					} else {
+						alert('정상적으로 처리되지 않았습니다.');
+					}
+
+				},
+				error : function() {
+					alert('처리 중 오류가 발생하였습니다.');
+				},
+				// 로딩중 화면 disabled
+				beforeSend : function() {
+					//	datagrid.lockGrid(); // loading img.
+				},
+				// 로딩중 img
+				complete : function() {
+					//	datagrid.lockGrid(false); // loading img. unload
+				}
+			});
+		}
+		*/
+
+	}
+
+	// 그리드 엑셀 파일로 저장
+	function saveExcelFile() {
+		//datagrid.exportData('xlsx', 'comCode');
+		let objExcelInfo = {
+			"strFileName" : "comCode.xlsx",
+			"strAction" : "/SBExcel/saveExcel",
+			"bIncludeData" : true,
+			"bSaveComboLabel" : false
+		};
+		datagrid.exportExcel(objExcelInfo);
+	}
+</script>
+
+<div class="content-wrap">
+	<div class="main">
+		<div class="container-fluid">
+			<%-- title --%>
+			<div class="row pb-0 mb-0" style="height: 50px;">
+				<div class="col p-r-0 title-margin-right">
+					<div class="page-header">
+						<div class="page-title">
+							<h1>
+								코드 <span></span>
+							</h1>
+						</div>
+					</div>
+				</div>
+				<div class="col p-l-0 ">
+					<%-- buttons --%>
+					<div class="page-header text-right" id="searchRow">
+						<button type="button" class="btn btn-primary" id="searchBtn">조회</button>
+						<button type="button" class="btn btn-info" id="regBtn">입력</button>
+						<button type="button" class="btn btn-info" id="saveBtn">저장</button>
+						<button type="button" class="btn btn-info" id="saveExcel">엑셀</button>
+					</div>
+				</div>
+			</div>
+
+			<section id="main-content mt-0 pt-0">
+				<%-- 검색영역 --%>
+				<div class="row">
+					<div class="col-lg-12">
+						<div class="card pb-1 pt-2">
+							<div class="card-body">
+
+								<div class="row" id="searchRow">
+
+									<div class="col-lg-4">
+										<div class="d-flex flex-row">
+											<div class="w-30 search_lbl text-right">
+												<span class="text-secondary">대분류</span>
+											</div>
+											<div class="w-70">
+												<select id="input_roleReg" v-model="selected" v-cloak
+													class="form-control p-0 pl-3 w-80 select_sch">
+													<option v-for="option in options"
+														v-bind:value="option.value">{{ option.text }}</option>
+												</select>
+											</div>
+										</div>
+									</div>
+
+									<div class="col-lg-4">
+										<div class="d-flex flex-row">
+											<div class="w-30 search_lbl text-right">
+												<span class="text-secondary">코드명</span>
+											</div>
+											<div class="w-70">
+												<input type='text' class="form-control h-75 w-80"
+													id="input_codeNm" />
+											</div>
+										</div>
+									</div>
+
+									<div class="col-lg-4">
+										<div class="d-flex flex-row">
+											<div class="w-30 search_lbl text-right">
+												<span class="text-secondary">사용</span>
+											</div>
+											<div class="w-70">
+												<select id="input_useYN" class="form-control p-0 pl-3 w-80"
+													style="height: 25px; font-size: 12px;">
+													<option value='' selected>전체</option>
+													<option value='Y'>사용</option>
+													<option value='N'>미사용</option>
+												</select>
+											</div>
+										</div>
+									</div>
+
+								</div>
+
+							</div>
+						</div>
+
+					</div>
+				</div>
+
+				<%-- 그리드 --%>
+				<div class="row" style="margin-top: -15px;">
+					<div class="col-lg-12">
+						<div class="card">
+							<div class="card-body">
+								<%-- grid area --%>
+								<div id="div_user_info" style="width: auto;"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+		</div>
+
+	</div>
+
+</div>
+
